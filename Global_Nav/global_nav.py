@@ -8,6 +8,8 @@
 # Or can the robot only Move OR Turn ? 
 import math as m
 from heapq import heappop, heappush
+EPSILON = 1e-5 
+SQRT_2 = m.sqrt(2)
 # for debugging only 
 import random
 from PIL import Image
@@ -48,10 +50,19 @@ def distance_map(env_map : list[list], start) :
         d_map.append(d_map_row)
     return d_map
 
-def motion_cost(prev_g) : 
+def motion_cost(prev_g, alpha: float) : 
     # start with simple motion cost before anything
-    return prev_g+1
+    # if diagonal, movment cost is sqrt(2), else 1 
+    linear_cost = 0
+    if abs(alpha) == m.pi/4 or abs(alpha) == 3*m.pi/4 :
+        linear_cost = SQRT_2 + prev_g[0]
+    else :
+        linear_cost = 1 + prev_g[0]
+    # we consider 90° turn to have the same cost as 1 linear motion 
+    g = abs(prev_g[1] - alpha)*4/(m.pi) + linear_cost
+    return g
     # TO DO : take into account rotation of the robot
+
     
 def reconstruct_path(current, came_from, start): 
     path = [came_from[current], current]
@@ -61,7 +72,7 @@ def reconstruct_path(current, came_from, start):
         previous_pos = came_from[previous_pos]
     return path
 # REAL THING : 
-def a_star (env_map_orig : list[list]) : 
+def a_star (env_map_orig : list[list], alpha_init) : 
     env_map = env_map_orig.copy()
     MAP_SIZE = (len(env_map), len(env_map[0])) 
     start = get_start(env_map)
@@ -70,23 +81,24 @@ def a_star (env_map_orig : list[list]) :
     open_set = []
     heappush(open_set, (h_map[start[0]][start[1]],0, start)) #heap is (f, g, current)
     came_from = {}
-    g_score = {start : 0}
+    g_score = {start : (0, alpha_init)}
     while open_set : 
         f, g, current = heappop(open_set)
         if current == end : 
             path = reconstruct_path(current, came_from, start)
             return path
         x,y = current
-        for dx, dy in [(1,0), (-1,0), (0,1), (0,-1)] : # TO DO : Check for diagonals 
+        for dx, dy in [(1,0), (-1,0), (0,1), (0,-1), (1,1), (-1,1), (1,-1), (-1,-1)] :
             nx, ny = x + dx, y+dy 
             if not((0 <= nx < MAP_SIZE[0]) and (0<= ny < MAP_SIZE[1])) :
                 continue
             if env_map[nx][ny] == -1 :
                 continue
-            new_g = motion_cost(g)
+            alpha = m.atan2(dy, dx)
+            new_g = (motion_cost(g_score[current], alpha))
             xplore = (nx,ny)
-            if xplore not in g_score or new_g < g_score[xplore] : 
-                g_score[xplore] = new_g
+            if xplore not in g_score or new_g < g_score[xplore][0] : 
+                g_score[xplore] = (new_g, alpha)
                 f = new_g + h_map[nx][ny]
                 heappush(open_set, (f, new_g, xplore))
                 came_from[xplore] = current
@@ -162,12 +174,3 @@ def print_map(env_map) :
         for j in range(MAP_SIZE[0]) : 
             print("%.2f" % env_map[i][j], end="|")
         print("\n----")
-# MAIN debug program
-env_map = debug_generate_maze(200,200)
-path = a_star(env_map)
-debug_maze_to_bitmap(env_map, filename="tests/maze.png")
-solved = env_map.copy()
-for i in path : 
-    solved[i[0]] [i[1]] = -4
-debug_maze_to_bitmap(solved, filename="tests/solved_maze.png")
-    
