@@ -16,16 +16,16 @@ ROBOT_SIZE_CM = 20 #cm
 # for debugging only 
 import random
 from PIL import Image
-def get_start(env_map): 
-    x,y = 0,0
-    for i in env_map:
-        for j in i : 
-            if j == -2 : 
-                return (x,y)
-            else :
-                y = y+1
-        x = x+1 
-        y= 0
+# def get_start(env_map): 
+#     x,y = 0,0
+#     for i in env_map:
+#         for j in i : 
+#             if j == -2 : 
+#                 return (x,y)
+#             else :
+#                 y = y+1
+#         x = x+1 
+#         y= 0
 def get_end(env_map): 
     x,y = 0,0
     for i in env_map:
@@ -83,9 +83,9 @@ def reconstruct_path(current, came_from, start):
         previous_pos = came_from[previous_pos]
     return path
 # REAL THING : 
-def a_star (env_map_orig : list[list], alpha_init, cm_px_scale) : 
+def a_star (env_map_orig : list[list], alpha_init, cm_px_scale, start) : 
     MAP_SIZE = (len(env_map_orig), len(env_map_orig[0])) 
-    start = get_start(env_map_orig)
+    # start = get_start(env_map_orig)
     end = get_end(env_map_orig)
     h_map = distance_map(env_map_orig, start)
     env_map = obstacle_scale(env_map_orig.copy(), cm_px_scale)
