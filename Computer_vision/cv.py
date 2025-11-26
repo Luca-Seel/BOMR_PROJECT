@@ -92,7 +92,7 @@ FREE_SPACE = 0
 OCCUPIED_SPACE = -1
 GOAL = -3
 
-DEBUG = True
+DEBUG = False
 #===========GEOMETRICAL FUNCIONS=====
 def orderpoints(pts) :
     """
@@ -331,7 +331,7 @@ def matrix_perspective(image) :
     contours, hierarchy = cv2.findContours(filtered_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     
-    if DEBUG : image_plot = image.copy()
+   
         
     squares = []
     for cnt in contours:
@@ -339,16 +339,9 @@ def matrix_perspective(image) :
         find, square = find_square(cnt, Env_approx, Min_area_env)
         if find :
             squares.append(square)
-            if DEBUG :
-                cv2.drawContours(image_plot, [square], -1, (255, 0, 0), 2)
+            
 
-    if DEBUG :
-        plt.figure()
-        plt.imshow(cv2.cvtColor(image_plot, cv2.COLOR_BGR2RGB))
-        plt.title("Detected Quadrilaterals (blue)")
-        plt.axis('off')
-        plt.show()
-        print(squares)
+   
     
     area = 0
     sheet = None
@@ -380,17 +373,7 @@ def get_robot(image):
     filtered_image = filter_image(image, B1_C, B2_C , B3_C, C1_C, C2_C, M1_C, CL1_C)
     
     contours, hierarchy = cv2.findContours(filtered_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-    if DEBUG :
-        plt.figure()
-        image_contours_plot = image.copy()
-        cv2.drawContours(image_contours_plot, contours, -1, (0, 255, 0), 2)
-        plt.imshow(cv2.cvtColor(image_contours_plot, cv2.COLOR_BGR2RGB))
-        plt.axis('off')
-        plt.title("Contours dessinés")
-        plt.show()
-     
-        image_contours = transformed_image.copy()
+        
     
     triangle =[]
     find_t = False
@@ -403,19 +386,10 @@ def get_robot(image):
             if conf < confidence :
                 triangle = tri
                 confidence = conf
-                if DEBUG :
-                    cv2.drawContours(image_contours, [triangle], -1, (255, 0, 0), 2)
                 #break
     pos = []
     angle = 0
     if triangle is not None and len(triangle) != 0:
-        if DEBUG :
-            plt.figure()
-            plt.imshow(cv2.cvtColor(image_contours, cv2.COLOR_BGR2RGB))
-            plt.title("Detected shapes (blue)")
-            plt.axis('off')
-            plt.show()
-            print(triangle)
             
         tri_ordered,_ = order_triangle(triangle[0], triangle[1], triangle[2])
         alt = altitude_line(tri_ordered[0], tri_ordered[1], tri_ordered[2] )
@@ -436,15 +410,6 @@ def get_map(image) :
     
     contours, hierarchy = cv2.findContours(filtered_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-    if DEBUG :
-        plt.figure()
-        image_contours_plot = image.copy()
-        cv2.drawContours(image_contours_plot, contours, -1, (0, 255, 0), 2)
-        plt.imshow(cv2.cvtColor(image_contours_plot, cv2.COLOR_BGR2RGB))
-        plt.axis('off')
-        plt.title("Contours dessinés")
-        plt.show()  
-        image_contours = transformed_image.copy()
 
     
     robot_pos,_, Rob = get_robot(image)
@@ -458,7 +423,7 @@ def get_map(image) :
         find_c, circle_pot, confidence_pot = find_circle(cnt, Min_area_goal, Max_area_goal)
         if find_s :
             squares.append(square)
-            if DEBUG : cv2.drawContours(image_contours, [square], -1, (255, 0, 0), 2)
+            
         if find_c:
             if Rob : 
                 # compute distance between robot and circle
@@ -486,20 +451,10 @@ def get_map(image) :
             ]
 
    
-    if DEBUG :
-        plt.figure()
-        plt.imshow(cv2.cvtColor(image_contours, cv2.COLOR_BGR2RGB))
-        plt.title("Detected shapes (blue)")
-        plt.axis('off')
-        plt.show()
-        #print(squares)
-    
     map_ = get_inter_shape(squares)
 
     
     if find_circ :
-        if DEBUG :
-            cv2.circle(image_contours, circle[0], circle[1], (0, 255, 0), -1)
             
         (cx, cy) = circle[0]
         radius = circle[1]
