@@ -55,7 +55,7 @@ def distance_map(env_map : list[list], start) :
         d_map_row = []
         for j in range(MAP_SIZE[1]): 
             if env_map[i][j] == -1 : 
-                continue 
+                d_map_row.append(-1)
             else : 
                 d_map_row.append(m.sqrt((start[0]-i)**2 + (start[1]-j)**2))
         d_map.append(d_map_row)
@@ -91,6 +91,10 @@ def a_star (env_map_orig : list[list], alpha_init, cm_px_scale, start) :
     env_map = obstacle_scale(env_map_orig.copy(), cm_px_scale)
     #env_map = env_map_orig.copy()
     open_set = []
+    print(len(h_map))
+    print(len(h_map[0]))
+    print(start[0])
+    print(start[1])
     heappush(open_set, (h_map[start[0]][start[1]],0, start)) #heap is (f, g, current)
     came_from = {}
     g_score = {start : (0, alpha_init)}

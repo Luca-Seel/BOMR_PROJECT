@@ -1,9 +1,38 @@
 import numpy as np
-
 # EKF
 Ts = 0.1  # time step in seconds
 L = 95  # distance between wheels in mm
 speed_to_mms = 0.3375  # conversion factor from thymio speed units to mm/s from solution ex.8 (in our measurement it was 0.43478260869565216)
+
+# Process noise for EKF (tune) (from model-mismatch/random-walk/control execution)
+q_proc = (
+    1e-3, 1e-2, 1e-4,   # q_x, q_y, q_theta (model mismatch)
+    75.72,  0.002692,         # q_v_ctrl, q_omega_ctrl (control execution noise)
+    1e-2, 1e-5          # q_v_bias, q_omega_bias (random walk on v, omega)
+)
+# Camera measurement noise (tune)
+r_cam = (1.435, 1.864, 0.001496)  # [mm^2, mm^2, rad^2]
+r_mot = (75.72, 0.002692)    # motor noise on v, omega
+
+
+class EKFState:
+    def __init__(self, x0=None, P0=None):
+        self.x = np.zeros(5) if x0 is None else np.array(x0, dtype=float)
+        self.P = 1000.0*np.eye(5) if P0 is None else np.array(P0, dtype=float)
+
+    def step(self, vl_cmd, vr_cmd, z_cam=None, r_cam=None, z_mot=None, r_mot=None, Ts=0.1, q_proc=None):
+        # predict
+        x_pred, P_pred = ekf_predict(self.x, self.P, vl_cmd, vr_cmd, Ts, q_proc)
+        # update(s)
+        if z_cam is not None and r_cam is not None:
+            x_pred, P_pred = ekf_update_cam(x_pred, P_pred, z_cam, r_cam)
+        if z_mot is not None and r_mot is not None:
+            x_pred, P_pred = ekf_update_motors(x_pred, P_pred, z_mot, r_mot)
+        self.x, self.P = x_pred, P_pred
+
+    def get_state(self):
+        # (x_mm, y_mm, theta_rad)
+        return float(self.x[0]), float(self.x[1]), float(wrap_angle(self.x[2]))
 
 def wrap_angle(theta):
     return (theta + np.pi) % (2*np.pi) - np.pi
@@ -20,10 +49,9 @@ def joseph_update(P, K, H, R): # better numerical robustness than  P_upd = (np.e
     IKH = I - K @ H
     return IKH @ P @ IKH.T + K @ R @ K.T
 
-def ekf_predict(x_prev, P_prev, u, Ts, q_proc):
+def ekf_predict(x_prev, P_prev, vl_cmd, vr_cmd, Ts, q_proc):
     x, y, th, v, om = x_prev
-    v_ctrl, om_ctrl = u
-
+    v_ctrl, om_ctrl = motors_to_vw(vl_cmd, vr_cmd, speed_to_mms, L)
     x_pred = np.array([
         x + v_ctrl * Ts * np.cos(th),
         y + v_ctrl * Ts * np.sin(th),
