@@ -51,17 +51,21 @@ async def move_to_pos(node, state, target_x_mm, target_y_mm,
     theta_ref = math.atan2(dy, dx)
     e = wrap_angle(theta_ref - theta)
     w = max(-w_clip, min(w_clip, kp_heading * e))
-    await set_motors(node, v_cmd - w, v_cmd + w)
-    print("motor sets:", v_cmd - w, v_cmd + w)
+    if abs(e) > np.pi/8:
+        await set_motors(node, w, -w)
+        print("motor sets:", w, -w)
+    else:
+        await set_motors(node, v_cmd + w, v_cmd - w)
+        print("motor sets:", v_cmd + w, v_cmd - w)
     
     #await stop(node)
     return dx, dy
         
 # -------------------- Path utilities --------------------
 
-def grid_to_mm(path_ij, cell_size_mm):
+def grid_to_mm(path_ij, cell_size_mm_x, cell_size_mm_y):
     # (i=row -> y, j=col -> x)
-    return [((j + 0.5) * cell_size_mm, (i + 0.5) * cell_size_mm) for (i, j) in path_ij]
+    return [((j + 0.5) * cell_size_mm_x, (i + 0.5) * cell_size_mm_y) for (i, j) in path_ij]
 
 def remove_collinear(pts, eps=1e-9):
     if len(pts) <= 2:
