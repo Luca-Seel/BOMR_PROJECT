@@ -1,5 +1,4 @@
 import numpy as np
-from cv import get_robot
 # EKF
 Ts = 0.1  # time step in seconds
 L = 95  # distance between wheels in mm
@@ -44,23 +43,6 @@ def motors_to_vw(vl, vr, speed_to_mms, L):
     v = (v_l + v_r) / 2.0
     w = (v_r - v_l) / L
     return v, w
-
-def get_motor_meas(node): 
-    # raw speeds in Thymio units (instantaneous)
-    vl = node.v.motors.left.speed 
-    vr = node.v.motors.right.speed
-    # convert to v [mm/s], omega [rad/s] 
-    v, w = motors_to_vw(vl, vr, speed_to_mms, L) 
-    return np.array([v, w], dtype=float)
-
-def get_cam_meas(image=None):
-    # get position from camera
-    if image is not None:
-        pos, angle, __ = get_robot(image)
-        return [pos, angle]
-    
-    return None
-        
 
 def joseph_update(P, K, H, R): # better numerical robustness than  P_upd = (np.eye(5) - K @ H) @ P_pred
     I = np.eye(P.shape[0])
@@ -156,8 +138,8 @@ def ekf_update_motors(x_pred, P_pred, z_mot, r_mot):
 
 async def ekf_task(
     ekf: EKFState,
-    node,
     client,
+    node,
     Ts=Ts,
     speed_to_mms=speed_to_mms,
     L=L,
@@ -200,24 +182,29 @@ async def ekf_task(
         # 1) Controls -> (v, omega)
         vl_cmd, vr_cmd = (0, 0) if get_cmd is None else get_cmd()
         v_cmd, w_cmd = motors_to_vw(vl_cmd, vr_cmd, speed_to_mms, L)
-
+        print(f"u={vl_cmd,vr_cmd} -> (v,ω)=({v_cmd:.1f},{w_cmd:.3f})")
         # 2) Predict
         x_pred, P_pred = ekf_predict(ekf.x, ekf.P, (v_cmd, w_cmd), Ts, q_proc)
 
         # 3) Updates (optional)
         if get_cam_meas is not None:
+            #await node.wait_for_variables({"motor.left.speed","motor.right.speed"})
             z_cam = get_cam_meas()
             if z_cam is not None:
                 x_pred, P_pred = ekf_update_cam(x_pred, P_pred, z_cam, r_cam)
 
         if get_motor_meas is not None:
             #await node.wait_for_variables({"motors.left.speed","motors.right.speed"})
-            z_mot = get_motor_meas(node)
+            z_mot = get_motor_meas()
+            print("z_mot:", z_mot)
             if z_mot is not None:
                 x_pred, P_pred = ekf_update_motors(x_pred, P_pred, z_mot, r_mot)
 
         # 4) Commit
         ekf.x, ekf.P = x_pred, P_pred
+        print("I have updated values for x and P")
+        print(x_pred)
+        print(P_pred)
 
         # 5) Pace the EKF loop
         await client.sleep(Ts)
