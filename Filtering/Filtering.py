@@ -20,9 +20,9 @@ class EKFState:
         self.x = np.zeros(5) if x0 is None else np.array(x0, dtype=float)
         self.P = 1000.0*np.eye(5) if P0 is None else np.array(P0, dtype=float)
 
-    def step(self, u, z_cam=None, r_cam=None, z_mot=None, r_mot=None, Ts=0.1, q_proc=None):
+    def step(self, vl_cmd, vr_cmd, z_cam=None, r_cam=None, z_mot=None, r_mot=None, Ts=0.1, q_proc=None):
         # predict
-        x_pred, P_pred = ekf_predict(self.x, self.P, u, Ts, q_proc)
+        x_pred, P_pred = ekf_predict(self.x, self.P, vl_cmd, vr_cmd, Ts, q_proc)
         # update(s)
         if z_cam is not None and r_cam is not None:
             x_pred, P_pred = ekf_update_cam(x_pred, P_pred, z_cam, r_cam)
@@ -49,10 +49,9 @@ def joseph_update(P, K, H, R): # better numerical robustness than  P_upd = (np.e
     IKH = I - K @ H
     return IKH @ P @ IKH.T + K @ R @ K.T
 
-def ekf_predict(x_prev, P_prev, u, Ts, q_proc):
+def ekf_predict(x_prev, P_prev, vl_cmd, vr_cmd, Ts, q_proc):
     x, y, th, v, om = x_prev
-    v_ctrl, om_ctrl = u
-
+    v_ctrl, om_ctrl = motors_to_vw(vl_cmd, vr_cmd, speed_to_mms, L)
     x_pred = np.array([
         x + v_ctrl * Ts * np.cos(th),
         y + v_ctrl * Ts * np.sin(th),
@@ -134,77 +133,3 @@ def ekf_update_motors(x_pred, P_pred, z_mot, r_mot):
     P_upd = (np.eye(5) - K @ H) @ P_pred
     #P_upd = joseph_update(P_pred, K, H, R)
     return x_upd, P_upd
-
-
-async def ekf_task(
-    ekf: EKFState,
-    client,
-    node,
-    Ts=Ts,
-    speed_to_mms=speed_to_mms,
-    L=L,
-    q_proc=q_proc,
-    r_cam=r_cam,
-    r_mot=r_mot,
-    get_cam_meas=None,
-    get_motor_meas=None,
-    get_cmd=None,
-):
-    """
-    Periodic EKF update task.
-
-    Parameters
-    ----------
-    ekf : EKFState
-        Container with fields ekf.x (5,) and ekf.P (5x5).
-    client : tdmclient.ClientAsync
-        For await client.sleep(Ts).
-    Ts : float
-        EKF update period [s].
-    speed_to_mms : float
-        Conversion factor from Thymio target units to mm/s.
-    L : float
-        Wheel separation [mm].
-    q_proc : tuple
-        Process noise parameters for ekf_predict(...).
-    r_cam : tuple or None
-        Measurement noise for camera z_cam = (x,y,theta). If None, skip camera update.
-    r_mot : tuple or None
-        Measurement noise for motor z_mot = (v,omega). If None, skip motor update.
-    get_cam_meas : callable or None
-        Function returning z_cam (x_mm, y_mm, theta_rad) or None if not available this tick.
-    get_motor_meas : callable or None
-        Function returning z_mot (v_mm_s, omega_rad_s) or None if not available this tick.
-    get_cmd : callable or None
-        Function returning last commanded wheel targets (vl_cmd, vr_cmd) in Thymio units.
-    """
-    while True:
-        # 1) Controls -> (v, omega)
-        vl_cmd, vr_cmd = (0, 0) if get_cmd is None else get_cmd()
-        v_cmd, w_cmd = motors_to_vw(vl_cmd, vr_cmd, speed_to_mms, L)
-        print(f"u={vl_cmd,vr_cmd} -> (v,ω)=({v_cmd:.1f},{w_cmd:.3f})")
-        # 2) Predict
-        x_pred, P_pred = ekf_predict(ekf.x, ekf.P, (v_cmd, w_cmd), Ts, q_proc)
-
-        # 3) Updates (optional)
-        if get_cam_meas is not None:
-            #await node.wait_for_variables({"motor.left.speed","motor.right.speed"})
-            z_cam = get_cam_meas()
-            if z_cam is not None:
-                x_pred, P_pred = ekf_update_cam(x_pred, P_pred, z_cam, r_cam)
-
-        if get_motor_meas is not None:
-            #await node.wait_for_variables({"motors.left.speed","motors.right.speed"})
-            z_mot = get_motor_meas()
-            print("z_mot:", z_mot)
-            if z_mot is not None:
-                x_pred, P_pred = ekf_update_motors(x_pred, P_pred, z_mot, r_mot)
-
-        # 4) Commit
-        ekf.x, ekf.P = x_pred, P_pred
-        print("I have updated values for x and P")
-        print(x_pred)
-        print(P_pred)
-
-        # 5) Pace the EKF loop
-        await client.sleep(Ts)

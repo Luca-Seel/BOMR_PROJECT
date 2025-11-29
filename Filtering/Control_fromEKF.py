@@ -42,37 +42,21 @@ async def stop(node):
 
 # -------------------- Go-to-waypoint primitives (EKF) --------------------
 
-async def move_to_position_ekf_vw(node, client, ekf_get_state,
-                                  target_x_mm, target_y_mm,
-                                  v_cmd=200, kp_heading=250.0,
-                                  dt=0.02, pos_tol=8.0, timeout=15.0,
-                                  w_clip=20):
-    """Smooth V–ω follower (no stop-turn). Uses EKF heading to steer continuously."""
-    t0 = now()
-    while True:
-        x, y, theta = ekf_get_state()[:3]
-        print("ekf results in move to pos:")
-        print(x, y, theta)
-        dx, dy = target_x_mm - x, target_y_mm - y
-        dist = math.hypot(dx, dy)
-        if dist <= pos_tol:
-            break
-        theta_ref = math.atan2(dx, dy)
-        e = wrap_angle(theta_ref - theta)
-        w = max(-w_clip, min(w_clip, kp_heading * e))
-        # Differential mixing
-        print("motor left")
-        print(v_cmd-w)
-        print("motor right")
-        print(v_cmd+w)
-        await set_motors(node, v_cmd - w, v_cmd + w)
-        await client.sleep(dt)
-        if now() - t0 > timeout:
-            print("move_to_position_ekf_vw: timeout")
-            break
-    await stop(node)
-    return ekf_get_state()[:3]
-
+async def move_to_pos(node, state, target_x_mm, target_y_mm,
+                v_cmd=20, kp_heading=250.0, w_clip=20):
+    x, y, theta = state[:3]
+    print("ekf:", x,y,theta)
+    dx, dy = target_x_mm - x, target_y_mm - y
+    print("dx, dy:", dx, dy)
+    theta_ref = math.atan2(dy, dx)
+    e = wrap_angle(theta_ref - theta)
+    w = max(-w_clip, min(w_clip, kp_heading * e))
+    await set_motors(node, v_cmd - w, v_cmd + w)
+    print("motor sets:", v_cmd - w, v_cmd + w)
+    
+    #await stop(node)
+    return dx, dy
+        
 # -------------------- Path utilities --------------------
 
 def grid_to_mm(path_ij, cell_size_mm):
@@ -97,22 +81,15 @@ def remove_collinear(pts, eps=1e-9):
 
 # -------------------- EKF-based path follower --------------------
 
-async def follow_astar_path_ekf(node, client, ekf_get_state,
-                                path_cells, cell_size_mm=2.0,
-                                use_smooth_vw=False,
-                                linear_speed=50, angular_speed=20, v_cmd=200, kp_heading=250.0,
-                                dt=0.02, pos_tol=8.0, ang_tol=0.02):
-    """Follow a path given as grid cells (A*). Converts to mm, simplifies, then visits each waypoint using EKF pose."""
-    waypoints = remove_collinear(grid_to_mm(path_cells, cell_size_mm))
-    print("Waypoints (mm):", waypoints)
-
-    for (tx, ty) in waypoints:
-        print("doing waypoint:")
-        print(tx, ty)
-        _ = await move_to_position_ekf_vw(
-            node=node, client=client, ekf_get_state=ekf_get_state,
-            target_x_mm=tx, target_y_mm=ty,
-            v_cmd=v_cmd, kp_heading=kp_heading,
-            dt=dt, pos_tol=pos_tol, timeout=max(15.0, 2.0*pos_tol/ max(1.0, v_cmd)))
-    # Return final EKF pose for logging
-    return ekf_get_state()[:3]
+async def follow_path(node, state, waypoints, v_cmd=200, kp_heading=250.0,
+                      pos_tol=8.0):
+    """Follow a path given as waypoints (A*)."""
+    tx, ty = waypoints[0]
+    dx, dy = await move_to_pos(node, state, tx, ty,
+                v_cmd=v_cmd, kp_heading=kp_heading, w_clip=200)
+    # check if waypoint reached, then delete it from our list
+    dist = math.hypot(dx, dy)
+    print("dist:", dist)
+    if dist <= pos_tol:
+        waypoints.pop(0) # remove first
+    return waypoints
