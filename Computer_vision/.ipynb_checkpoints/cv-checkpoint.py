@@ -14,6 +14,7 @@ def get_picture_optimized(cap):
 
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
+    cap.set(cv2.CAP_PROP_EXPOSURE, -7)
     time.sleep(0.1)  # let the camera apply settings
     
     ret, frame = cap.read()
@@ -77,8 +78,8 @@ D_O = 5
 
 #FILTERING PARAMETERS FOR THE CORRECTED IMAGE
 B1_C = 5
-B2_C = 10
-B3_C = 10
+B2_C = 80
+B3_C = 80
 C1_C = 0.4
 C2_C = 1.6
 M1_C = 5
