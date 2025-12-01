@@ -5,12 +5,13 @@ EPSILON = 1e-2
 # meaning distance_to_obstacle = 12 - (IR_MEASURE -1000)/250 
 def reading_to_distance (read): 
     return 12 - (read-1500)/250
-ANGLES_IR_SENSORS = [-m.pi/4, -m.pi/8, 0, m.pi/8, m.pi/4]
+ANGLES_IR_SENSORS = [-m.pi/4, -m.pi/6, 0, m.pi/6, m.pi/4]
 SENSORS_WEIGHT = [2, 3, 8, 2, 1]
-def back_to_global (curr_dir, final_vect):
-    relative_angle = m.acos(curr_dir[0]/(m.sqrt(curr_dir[0]**2+curr_dir[1]**2)))
-    vect = (final_vect[0]*m.cos(relative_angle)+final_vect[1]*m.sin(relative_angle), final_vect[0]*m.sin(relative_angle)+final_vect[1]*(-m.cos(relative_angle)))
-    return vect
+def prox_less_threshold(prox_val : list, threshold: int): 
+    for i in prox_val : 
+        if i >= threshold : 
+            return False
+    return True
 def vect_calculation (objectif_coord : tuple, curr_pos : tuple, curr_dir : tuple, prox_read : list, REJ_WEIGHT, debug=False) : 
     try : 
         attraction_distance = m.sqrt((objectif_coord[0] - curr_pos[0])**2+ (objectif_coord[1] - curr_pos[1])**2)
