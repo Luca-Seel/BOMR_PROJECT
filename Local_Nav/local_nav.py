@@ -1,5 +1,6 @@
 import math as m
 EPSILON = 1e-2
+WAIT_TIME = 0.2
 # Test showing that the sensors are 1/X where x is distance : 12cm (minimum detection distance) --> 1000   6cm --> 2500 3cm --> 3600
 # correction : (12 - distance_to_obstacle)*250 + 1000 = IR_MEASURE (more or less... )
 # meaning distance_to_obstacle = 12 - (IR_MEASURE -1000)/250 

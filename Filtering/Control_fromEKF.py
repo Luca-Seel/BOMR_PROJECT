@@ -45,18 +45,18 @@ async def stop(node):
 async def move_to_pos(node, state, target_x_mm, target_y_mm,
                 v_cmd=20, kp_heading=250.0, w_clip=20):
     x, y, theta = state[:3]
-    print("ekf:", x,y,theta)
+    #print("ekf:", x,y,theta)
     dx, dy = target_x_mm - x, target_y_mm - y
-    print("dx, dy:", dx, dy)
+    #print("dx, dy:", dx, dy)
     theta_ref = math.atan2(dy, dx)
     e = wrap_angle(theta_ref - theta)
     w = max(-w_clip, min(w_clip, kp_heading * e))
     if abs(e) > np.pi/8:
         await set_motors(node, w, -w)
-        print("motor sets:", w, -w)
+        #print("motor sets:", w, -w)
     else:
         await set_motors(node, v_cmd + w, v_cmd - w)
-        print("motor sets:", v_cmd + w, v_cmd - w)
+        #print("motor sets:", v_cmd + w, v_cmd - w)
     
     #await stop(node)
     return dx, dy
@@ -93,7 +93,7 @@ async def follow_path(node, state, waypoints, v_cmd=200, kp_heading=250.0,
                 v_cmd=v_cmd, kp_heading=kp_heading, w_clip=200)
     # check if waypoint reached, then delete it from our list
     dist = math.hypot(dx, dy)
-    print("dist:", dist)
+    #print("dist:", dist)
     if dist <= pos_tol:
         waypoints.pop(0) # remove first
     return waypoints
