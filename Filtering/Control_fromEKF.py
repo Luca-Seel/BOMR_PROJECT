@@ -43,7 +43,7 @@ async def stop(node):
 # -------------------- Go-to-waypoint primitives (EKF) --------------------
 
 async def move_to_pos(node, state, target_x_mm, target_y_mm,
-                v_cmd=20, kp_heading=250.0, w_clip=20):
+                v_cmd=200, kp_heading=90.0, w_clip=20):
     x, y, theta = state[:3]
     #print("ekf:", x,y,theta)
     dx, dy = target_x_mm - x, target_y_mm - y
@@ -85,7 +85,7 @@ def remove_collinear(pts, eps=1e-9):
 
 # -------------------- EKF-based path follower --------------------
 
-async def follow_path(node, state, waypoints, v_cmd=200, kp_heading=250.0,
+async def follow_path(node, state, waypoints, v_cmd=200, kp_heading=90.0,
                       pos_tol=8.0):
     """Follow a path given as waypoints (A*)."""
     tx, ty = waypoints[0]
