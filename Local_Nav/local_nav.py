@@ -35,3 +35,44 @@ def vect_calculation (objectif_coord : tuple, curr_pos : tuple, curr_dir : tuple
 
 
 
+# Utilities to add global obstacles to repulsion vector in local obstacle avoidance
+def add_unknown_repulsion(curr_pos, unknown_cells, UNKNOWN_WEIGHT=0.5, p=1.0, max_range=15.0):
+    """
+    curr_pos: (x_cm, y_cm)
+    unknown_cells: iterable of (x_cm, y_cm) of the centers of -1 cells
+    UNKNOWN_WEIGHT: small global weight
+    p: distance power for attenuation
+    max_range: ignore far unknowns (cm) to limit computation/noise
+    """
+    rx, ry = curr_pos
+    ux, uy = 0.0, 0.0
+    for cx, cy in unknown_cells:
+        dx = rx - cx
+        dy = ry - cy
+        d = m.hypot(dx, dy)
+        if d < 1e-6 or d > max_range:
+            continue
+        # unit vector from cell to robot
+        ux += (dx / d) * (1.0 / ((d + EPSILON)**p))
+        uy += (dy / d) * (1.0 / ((d + EPSILON)**p))
+    return (UNKNOWN_WEIGHT * ux, UNKNOWN_WEIGHT * uy)
+
+def unknown_cells_world(grid, cell_size_cm_x, cell_size_cm_y):
+    """
+    Turn indices of -1 cells into world coordinates (cm).
+    origin_world_cm: (x0_cm, y0_cm) of grid cell (0,0)
+    res_cm: cell size (cm)
+    """
+    x0, y0 = (0, 0)
+    cells = []
+    H, W = len(grid), len(grid[0])
+    for i in range(H):
+        for j in range(W):
+            if grid[i][j] == -1:
+                cx = x0 + (j + 0.5) * cell_size_cm_x
+                cy = y0 + (i + 0.5) * cell_size_cm_y
+                cells.append((cx, cy))
+    return cells
+
+
+
