@@ -23,7 +23,7 @@ async def turn_in_place(node, client, delta_theta, speed=150, dt=0.02, tolerance
     # sign and targets
     sgn = 1 if delta_theta >= 0 else -1
     await node.set_variables({
-        "motor.left.target":  [-sg,n*int(speed)],
+        "motor.left.target":  [-sgn*int(speed)],
         "motor.right.target": [ sgn*int(speed)],
     })
     await node.wait_for_variables({"motors.left.speed", "motors.right.speed"})
@@ -50,9 +50,9 @@ async def turn_in_place(node, client, delta_theta, speed=150, dt=0.02, tolerance
             print("turn_in_place: timeout")
             break
 
-        await client.sleep(dt) # why?
+        await client.sleep(dt)
 
-    await stop(node) # why?
+    await stop(node)
     
 async def move_straight(node, client, distance_mm, speed=150, dt=0.02, timeout=10.0):
     dir_sgn = 1 if distance_mm >= 0 else -1

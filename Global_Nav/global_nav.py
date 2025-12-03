@@ -1,31 +1,16 @@
 ## A star algorithm since this is the most efficient and I can implement rotation directly in the traveling cost
-## input : 2D array with start and end position. Obstacles are mapped as 1 and free is 0 
+## input : 2D array with start and end position. Obstacles are mapped as -1 and free is 0 
 
-# Note to self : minimize f(n) = h(n) + g(n) where h is the distance function and g is the movement cost function 
-# Movement cost can be computed from orientation, rotation and maybe (?) make it that the cost decreases if we go straight for a while ? Since that would mean we can go "faster" 
-# How to define movmement cost ? I think a good way to define movement cost is by pairing it with time. 
-# time = velocity/distance, but velocity is a vector, and maybe also considering acceleration ? Or is that too much ? Do I consider that the robot can turn AND move ? 
-# Or can the robot only Move OR Turn ? 
 import math as m
 from heapq import heappop, heappush
 from scipy.ndimage import distance_transform_edt
 import numpy as np
 EPSILON = 1e-5 
-SQRT_2 = m.sqrt(2)
-ROBOT_SIZE_CM = 20 #cm 
+SQRT_2 = m.sqrt(2) # for computing efficiency
+ROBOT_SIZE_CM = 10 #cm 
 # for debugging only 
 import random
-from PIL import Image
-# def get_start(env_map): 
-#     x,y = 0,0
-#     for i in env_map:
-#         for j in i : 
-#             if j == -2 : 
-#                 return (x,y)
-#             else :
-#                 y = y+1
-#         x = x+1 
-#         y= 0
+import PIL.Image as Image
 def get_end(env_map): 
     x,y = 0,0
     for i in env_map:
@@ -40,15 +25,15 @@ def get_end(env_map):
 def obstacle_scale(env_map : list[list], scale) : 
     ROBOT_SIZE_PX = ROBOT_SIZE_CM/scale 
     obstacle_map = ~(np.array(env_map) == -1)
-    distance_to_obstacle_map = distance_transform_edt(obstacle_map)
+    distance_to_obstacle_map = distance_transform_edt(obstacle_map) #scpiy function that replaces every non-zero cell with distance to
+                                                                    # closest 0 cell
     scaled_obstacles = distance_to_obstacle_map <= ROBOT_SIZE_PX
     return [[-1 if scaled_obstacles[i][j] else env_map[i][j]
              for j in range(len(env_map[0]))]
              for i in range(len(env_map))]
 
 def distance_map(env_map : list[list], start) : 
-    # should the start_pos be given in the sense that, should I find it in the matrix or should I take it as parameter ? 
-    # Same question for end position
+    # implements heuristic fungction with Euclidian distance
     MAP_SIZE = (len(env_map), len(env_map[0]))
     d_map = []
     for i in range(MAP_SIZE[0]) :
@@ -69,10 +54,9 @@ def motion_cost(prev_g, alpha: float) :
         linear_cost = SQRT_2 + prev_g[0]
     else :
         linear_cost = 1 + prev_g[0]
-    # we consider 90° turn to have the same cost as 1 linear motion 
+    # we consider 45° turn to have the same cost as 1 linear motion 
     g = abs(prev_g[1] - alpha)*4/(m.pi) + linear_cost
     return g
-    # TO DO : take into account rotation of the robot
 
     
 def reconstruct_path(current, came_from, start): 
@@ -82,19 +66,14 @@ def reconstruct_path(current, came_from, start):
         path.insert(0,came_from[previous_pos])
         previous_pos = came_from[previous_pos]
     return path
-# REAL THING : 
+
+# A* algorithm with Euclidean distance as h(n) and linear + angle movement cost
 def a_star (env_map_orig : list[list], alpha_init, cm_px_scale, start) : 
     MAP_SIZE = (len(env_map_orig), len(env_map_orig[0])) 
-    # start = get_start(env_map_orig)
     end = get_end(env_map_orig)
     h_map = distance_map(env_map_orig, start)
     env_map = obstacle_scale(env_map_orig.copy(), cm_px_scale)
-    #env_map = env_map_orig.copy()
     open_set = []
-    print(len(h_map))
-    print(len(h_map[0]))
-    print(start[0])
-    print(start[1])
     heappush(open_set, (h_map[start[0]][start[1]],0, start)) #heap is (f, g, current)
     came_from = {}
     g_score = {start : (0, alpha_init)}
@@ -104,7 +83,6 @@ def a_star (env_map_orig : list[list], alpha_init, cm_px_scale, start) :
         f, g, current = heappop(open_set)
         if current == end : 
             path = reconstruct_path(current, came_from, start)
-            print(counter)
             return path
         x,y = current
         for dx, dy in [(1,0), (-1,0), (0,1), (0,-1), (1,1), (-1,1), (1,-1), (-1,-1)] :
@@ -125,7 +103,7 @@ def a_star (env_map_orig : list[list], alpha_init, cm_px_scale, start) :
                 except IndexError : 
                     print(f"ALL INDEXES ARE : {nx}, {ny}, {xplore}")
 # debug functions
-
+# AI generated to construct random maps and visualize them
 def debug_generate_maze(rows, cols, n_blobs=8, blob_size=40):
     """
     Generate a random maze with large obstacle blocks.
@@ -208,10 +186,3 @@ def print_map(env_map) :
         for j in range(MAP_SIZE[0]) : 
             print("%.2f" % env_map[j][i], end="|")
         print("\n----")
-
-
-## quick debug : 
-
-# env_map = debug_generate_maze(1000, 1000, n_blobs=4, blob_size=10000)
-# debug_maze_to_bitmap(env_map,filename="tests/maze.png") 
-# debug_maze_to_bitmap(obstacle_scale(env_map, 10), filename="tests/inflated_maze.png")
