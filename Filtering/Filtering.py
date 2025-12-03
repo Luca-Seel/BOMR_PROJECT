@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 # EKF
 Ts = 0.1  # time step in seconds
 L = 95  # distance between wheels in mm
@@ -133,3 +134,68 @@ def ekf_update_motors(x_pred, P_pred, z_mot, r_mot):
     P_upd = (np.eye(5) - K @ H) @ P_pred
     #P_upd = joseph_update(P_pred, K, H, R)
     return x_upd, P_upd
+
+def init_Ppred_view(N_states=5, heatmap_update_every=20, log_scale=True, warmup_for_clim=10):
+    plt.ion()
+
+    # Figure and axes
+    fig, (ax_diag, ax_hm) = plt.subplots(2, 1, figsize=(7, 7), constrained_layout=True)
+
+    # Top: diag lines
+    lines = [ax_diag.plot([], [], label=f'var[{i}]')[0] for i in range(N_states)]
+    ax_diag.set_xlabel('time step')
+    ax_diag.set_ylabel('variance (log10)' if log_scale else 'variance')
+    ax_diag.grid(True)
+    ax_diag.legend()
+
+    # Bottom: heatmap
+    im = ax_hm.imshow(np.eye(N_states), cmap='viridis', interpolation='nearest')
+    cbar = plt.colorbar(im, ax=ax_hm)
+    ax_hm.set_title('P_pred')
+    ax_hm.set_xlabel('state j')
+    ax_hm.set_ylabel('state i')
+
+    # Internal state
+    var_hist = [[] for _ in range(N_states)]
+    k_hist = []
+    clim_samples = []
+    autoscale_diag = True
+    state = {'step': -1, 'clim_fixed': False}
+
+    def update(P_pred):
+        # advance internal step counter
+        state['step'] += 1
+        s = state['step']
+
+        # Top panel: variances
+        diag = np.diag(P_pred).astype(float)
+        vals = np.log10(np.maximum(diag, 1e-12)) if log_scale else diag
+
+        k_hist.append(s)
+        for i in range(N_states):
+            var_hist[i].append(vals[i])
+            lines[i].set_data(k_hist, var_hist[i])
+
+        if autoscale_diag:
+            ax_diag.relim()
+            ax_diag.autoscale_view()
+
+        # Heatmap color limit warmup/fix
+        if not state['clim_fixed']:
+            clim_samples.append(P_pred.copy())
+            if s >= warmup_for_clim - 1:
+                P_stack = np.stack(clim_samples, axis=0)
+                vmin, vmax = float(np.min(P_stack)), float(np.max(P_stack))
+                if vmax <= vmin:  # fallback
+                    vmin, vmax = float(np.min(P_pred)), float(np.max(P_pred))
+                im.set_clim(vmin=vmin, vmax=vmax)
+                cbar.update_normal(im)
+                state['clim_fixed'] = True
+
+        # Update heatmap every N steps (always during warmup)
+        if (s % heatmap_update_every == 0) or (not state['clim_fixed']):
+            im.set_data(P_pred)
+
+        plt.pause(0.001)
+
+    return update
