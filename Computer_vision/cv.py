@@ -66,9 +66,9 @@ R_G_p = length_real_to_pixel(R_G,[L,W], SIZE)
 RATIO_T = (L_T*H_T/2) / (L*W) 
 
 #FILTERING PARAMETERS FOR THE ORIGINAL IMAGE
-B1_O = 10
-B2_O = 80
-B3_O = 80
+B1_O = 5
+B2_O = 50
+B3_O = 50
 C1_O = 0.5
 C2_O = 1.5
 M1_O = 8
@@ -77,7 +77,7 @@ M_O = 5
 D_O = 5
 
 #FILTERING PARAMETERS FOR THE CORRECTED IMAGE
-B1_C = 5
+B1_C = 10
 B2_C = 80
 B3_C = 80
 C1_C = 0.4
@@ -89,8 +89,8 @@ D_C = 5
 
 #FILTERING PARAMETERS FOR ROBOT DETECTION
 B1_T = 5
-B2_T = 10
-B3_T = 10
+B2_T = 80
+B3_T = 80
 C1_T = 0.4
 C2_T = 1.6
 M1_T = 5
@@ -100,8 +100,9 @@ D_T = 2
 
 
 #PARAMETERS TO DETECT THE ENV
-Min_area_env = 1920*1080*0.4   #Min area in pixel of the env
-Env_approx = 0.01
+#Min_area_env = 1920*1080*0.01   #Min area in pixel of the env
+Min_area_env = 1000
+Env_approx = 0.1
 
 #PARAMETERS TO DETECT THE OBSTACLES
 Min_area_obs = SIZE[0]*SIZE[1]*0.005   #Min area in pixel of the env
@@ -113,8 +114,8 @@ Min_area_goal = np.pi * R_G_p * R_G_p *0.8
 Max_area_goal = np.pi * R_G_p * R_G_p * 1.8
 
 #PARAMETERS TO DETECT THE ROBOT
-Min_area_rob = (L_T_p*H_T_p /2) * 0.8   #Min area in pixel of the env
-Max_area_rob =  (L_T_p*H_T_p /2) * 1.2
+Min_area_rob = (L_T_p*H_T_p /2) * 0.2   #Min area in pixel of the env
+Max_area_rob =  (L_T_p*H_T_p /2) * 1.8
 Rob_approx = 0.08
 
 #ROBOT CARACTERISTICS

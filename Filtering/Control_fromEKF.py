@@ -43,25 +43,29 @@ async def stop(node):
 # -------------------- Go-to-waypoint primitives (EKF) --------------------
 
 async def move_to_pos(node, state, target_x_mm, target_y_mm,
-                v_cmd=20, kp_heading=250.0, w_clip=20):
+                v_cmd=200, kp_heading=90.0, w_clip=20):
     x, y, theta = state[:3]
-    print("ekf:", x,y,theta)
+    #print("ekf:", x,y,theta)
     dx, dy = target_x_mm - x, target_y_mm - y
-    print("dx, dy:", dx, dy)
+    #print("dx, dy:", dx, dy)
     theta_ref = math.atan2(dy, dx)
     e = wrap_angle(theta_ref - theta)
     w = max(-w_clip, min(w_clip, kp_heading * e))
-    await set_motors(node, v_cmd - w, v_cmd + w)
-    print("motor sets:", v_cmd - w, v_cmd + w)
+    if abs(e) > np.pi/8:
+        await set_motors(node, w, -w)
+        #print("motor sets:", w, -w)
+    else:
+        await set_motors(node, v_cmd + w, v_cmd - w)
+        #print("motor sets:", v_cmd + w, v_cmd - w)
     
     #await stop(node)
     return dx, dy
         
 # -------------------- Path utilities --------------------
 
-def grid_to_mm(path_ij, cell_size_mm):
+def grid_to_mm(path_ij, cell_size_mm_x, cell_size_mm_y):
     # (i=row -> y, j=col -> x)
-    return [((j + 0.5) * cell_size_mm, (i + 0.5) * cell_size_mm) for (i, j) in path_ij]
+    return [((j + 0.5) * cell_size_mm_x, (i + 0.5) * cell_size_mm_y) for (i, j) in path_ij]
 
 def remove_collinear(pts, eps=1e-9):
     if len(pts) <= 2:
@@ -81,7 +85,7 @@ def remove_collinear(pts, eps=1e-9):
 
 # -------------------- EKF-based path follower --------------------
 
-async def follow_path(node, state, waypoints, v_cmd=200, kp_heading=250.0,
+async def follow_path(node, state, waypoints, v_cmd=200, kp_heading=90.0,
                       pos_tol=8.0):
     """Follow a path given as waypoints (A*)."""
     tx, ty = waypoints[0]
@@ -89,7 +93,7 @@ async def follow_path(node, state, waypoints, v_cmd=200, kp_heading=250.0,
                 v_cmd=v_cmd, kp_heading=kp_heading, w_clip=200)
     # check if waypoint reached, then delete it from our list
     dist = math.hypot(dx, dy)
-    print("dist:", dist)
+    #print("dist:", dist)
     if dist <= pos_tol:
         waypoints.pop(0) # remove first
     return waypoints

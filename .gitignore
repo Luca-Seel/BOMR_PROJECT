@@ -1,5 +1,10 @@
-/Global_Nav/__pycache__
-/Global_Nav/.ipynb_checkpoints
-/Loca_Nav/__pycache__
-/.ipynb_checkpoints
-/.virtual_documents
+Filtering/__pycache__/*
+*__pycache__
+/Global_Nav/.ipynb_checkpoints/
+/.ipynb_checkpoints/
+/.virtual_documents/
+Computer_vision/__pycache__/*
+Local_Nav/__pycache__/*
+*.png
+!Global_Nav/tests/maze.png
+*.ipynb_checkpoints
