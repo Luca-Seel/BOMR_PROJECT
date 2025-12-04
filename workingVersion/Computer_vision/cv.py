@@ -114,8 +114,8 @@ Min_area_goal = np.pi * R_G_p * R_G_p *0.8
 Max_area_goal = np.pi * R_G_p * R_G_p * 1.8
 
 #PARAMETERS TO DETECT THE ROBOT
-Min_area_rob = (L_T_p*H_T_p /2) * 0.2   #Min area in pixel of the env
-Max_area_rob =  (L_T_p*H_T_p /2) * 1.8
+Min_area_rob = (L_T_p*H_T_p /2) * 0.5   #Min area in pixel of the env
+Max_area_rob =  (L_T_p*H_T_p /2) * 1.5
 Rob_approx = 0.08
 
 #ROBOT CARACTERISTICS
@@ -275,17 +275,17 @@ def order_triangle(P1,P2,P3) :
         TOP = P2
         LEFT = P1
         RIGHT = P3
-        confidence = diff_A_B
+        confidence = diff_A_B/dist_B
     elif diff_B_C < diff_A_B and diff_B_C < diff_C_A :
         TOP = P3
         LEFT = P2
         RIGHT = P1
-        confidence = diff_B_C
+        confidence = diff_B_C/dist_C
     elif diff_C_A < diff_A_B and diff_C_A < diff_B_C :
         TOP = P1
         LEFT = P3
         RIGHT = P2
-        confidence = diff_C_A
+        confidence = diff_C_A//dist_A
     else :
         print("no summit found, adjust threshold")
 

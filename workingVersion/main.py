@@ -22,7 +22,7 @@ async def main(cap):
         pass # ignore it it wasn't locked
     
     WAIT_TIME = 0.2
-    #---- VIZUALIZATION PARAMETERS ----
+    #---- VISUALIZATION PARAMETERS ----
     # Set camera resolution
     w = 1920
     h = 1080
@@ -41,32 +41,16 @@ async def main(cap):
     matrix = com.matrix_perspective(frame)
     transformed_frame = com.convert_perspective(frame, matrix)
     
-    
     global_map = com.get_map(transformed_frame)
     robot = com.get_robot(transformed_frame)
-    #solved = global_map[:]
+
     #FIND PATH
     scaling = 0.15
     path = path = gb.a_star(global_map, robot[1], scaling, 
                      (int(round(robot[0][1])), int(round(robot[0][0]))))
     
-    #print(path)
     #--- NAVIGATION PARAMETERS ---
-    
-    # params ekf
-    speed_to_mms = 0.4347  # conversion factor from thymio speed units to mm/s from solution ex.8 
-    # Process noise for EKF (tune) (from model-mismatch/random-walk/control execution)
-    q_proc = (
-        1e-10, 1e-10, 1e-3,   # q_x, q_y, q_theta (model mismatch)
-        75.72,  0.002692,         # q_v_ctrl, q_omega_ctrl (control execution noise)
-        1e-2, 1e-5          # q_v_bias, q_omega_bias (random walk on v, omega)
-    )
-    # Camera measurement noise (tune)
-    r_cam = (1.435, 1.864, 0.001496)  # [mm^2, mm^2, rad^2]
-    r_mot = (75.72, 0.002692)    # motor noise on v, omega
-    
     # help functions 
-    # Utility to pop waypoint if we pass it by local obstacle avoidance
     thresh = 120
     def dist_mm(p, q):
         return float(np.hypot(p[0] - q[0], p[1] - q[1]))
@@ -81,41 +65,49 @@ async def main(cap):
     conv_y = 10 * (com.W / com.SIZE[0])
     # 1) buffers
     traj = deque(maxlen=2000)   # (x,y)
-    # convert path!
+    # convert path
     waypoints = control.remove_collinear(control.grid_to_mm(path, cell_size_mm_x=conv_x, cell_size_mm_y=conv_y))
     step_count = 0
+    # ---- Init Kidnap ------
     kidnap_first = False
     kidnap_second = False
-    # kidnapping help function
+    # kidnapping help functions
     async def test_kidnap():
         kidnap_thresh = 500  # off ground
         # Kidnap check
         if np.mean(np.array(node["prox.ground.delta"][:])) < kidnap_thresh :
             print("kidnapped")
-            #print(np.array(node["prox.ground.delta"][:]))
             return True
         else:
             return False
     
     def update_kidnap(waypoints, ekf_traj):
-        # Compute distances between last three positions
+        # Compute distance between last two positions
         p1 = ekf_traj[-1][0:2]
         p2 = ekf_traj[-2][0:2]
-        # Compute midpoint of the pair that gave the min distance
+        # Compute midpoint of the pair
         mean = ((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2)
-        # compute distances to waypoints
+        # compute distance to waypoints
         distance_waypoints = [dist_mm(mean, wps) for wps in waypoints]
         min_index = np.argmin(distance_waypoints)
         return min_index
             
     # global obstacle repulsion map
-    # Build unknown cells list once per few cycles to save time
     unk_cells = ln.unknown_cells_world(global_map, conv_x/10, conv_y/10)
-    #sleep_time = 1 # sleep in obstacle avoidance for this number of loops
-    #loop_count = 0
     
     # --- INIT EKF----
-    #image = transformed_frame
+    # params ekf
+    speed_to_mms = 0.4347  # conversion factor from thymio speed units to mm/s 
+    # Process noise for EKF (tune) 
+    q_proc = (
+        1e-10, 1e-10, 1e-3,   # q_x, q_y, q_theta (model mismatch)
+        75.72,  0.002692,         # q_v_ctrl, q_omega_ctrl (control execution noise)
+        1e-2, 1e-5          # q_v_bias, q_omega_bias (random walk on v, omega)
+    )
+    # Camera measurement noise 
+    r_cam = (1.435, 1.864, 0.001496)  # [mm^2, mm^2, rad^2]
+    r_mot = (75.72, 0.002692)    # motor noise on v, omega
+    # get first position
     pos, angle, __ = com.get_robot(transformed_frame)
     pos = pixel_to_world_mm(pos)
     x = pos[0]
@@ -123,7 +115,32 @@ async def main(cap):
     x0=[x, y, angle,0,0]
     ekf = filt.EKFState(x0, P0=1000*np.eye(5))
     vl_cmd, vr_cmd = [0, 0]
-    #print(ekf)
+    
+    #--- HELPER FUNCTIONS FOR EKF --- 
+    def get_motor_meas(): 
+        # raw speeds in Thymio units (instantaneous)
+        vl = node["motor.left.speed"]
+        vr = node["motor.right.speed"]
+        # no IMU because acc is limited
+        # convert to v [mm/s], omega [rad/s] 
+        v, w = filt.motors_to_vw(vl, vr, speed_to_mms, filt.L)
+        print("get_motor_meas", v, w) 
+        return np.array([v, w], dtype=float)
+    
+    def get_cam_meas(image=None):
+        # get position from camera
+        if image is not None:
+            pos, angle, Rob = com.get_robot(image)
+            #x = SIZE[1] - pos[0] 
+            if Rob ==  False:
+                return None
+            pos = pixel_to_world_mm(pos)
+            x = pos[0]
+            y = pos[1]
+            #print("Camera Robot Position", x, y, angle)
+            return np.array([x, y, angle], dtype=float)
+        return None
+    
     
     # --- PLOTTING ---
     ekf_traj = [] # for plot
@@ -132,10 +149,6 @@ async def main(cap):
         s = ekf.get_state()  # (x,y,theta)
         ekf_traj.append((s[0], s[1], s[2]))  # log x,y each time it's called
         return s
-    # plot variances
-    #update_Ppred = filt.init_Ppred_view(heatmap_update_every=1) 
-    #update_Ppred(ekf.P)
-    
     
     #---VISU---
     for i in path : 
@@ -180,34 +193,7 @@ async def main(cap):
     print("Connected:", node)
     motors = aw(node.wait_for_variables({"motor.left.speed","motor.right.speed"}))
     
-    
-    #--- HELPER FUNCTIONS FOR EKF --- 
-    def get_motor_meas(): 
-        # raw speeds in Thymio units (instantaneous)
-        vl = node["motor.left.speed"]
-        vr = node["motor.right.speed"]
-        # no IMU because acc is limited
-        # convert to v [mm/s], omega [rad/s] 
-        v, w = filt.motors_to_vw(vl, vr, speed_to_mms, filt.L)
-        print("get_motor_meas", v, w) 
-        return np.array([v, w], dtype=float)
-    
-    def get_cam_meas(image=None):
-        # get position from camera
-        if image is not None:
-            pos, angle, Rob = com.get_robot(image)
-            #x = SIZE[1] - pos[0] 
-            if Rob ==  False:
-                return None
-            pos = pixel_to_world_mm(pos)
-            x = pos[0]
-            y = pos[1]
-            #print("Camera Robot Position", x, y, angle)
-            return np.array([x, y, angle], dtype=float)
-        return None
-    
-    
-    
+    # local avoidance
     obstacle_not_passed = False
     stop = False
     
@@ -244,29 +230,20 @@ async def main(cap):
             
             drawing_robot_real.append(p0)
             
-            
-            #found = False
         
 
         for i in range(len(drawing_robot_real)):
                 robot1 = drawing_robot_real[i]
-                
-                #end_point = drawing_robot_real[i][1]
                 cv2.circle(vis, robot1, 5, (0,0,255), -1)
         
         for i in range(len(ekf_traj)):
                 x, y, _ = ekf_traj[i] # x, y in your EKF state 
-                #print(len(ekf_traj))
                 x = com.length_real_to_pixel(x/10, [com.L,com.W], com.SIZE)
                 y = com.length_real_to_pixel(y/10, [com.L,com.W], com.SIZE)
-                #y = y
                 px, py = int(x), int(y) # or apply world→pixel mapping first
-                #print(px, py)
                 cv2.circle(vis, (px, py), 2, (255, 0, 0), -1)
                 
-        # Optional: show a status message
         
-
         H, W = vis.shape[:2]
         box_h = 48 # banner height in pixels 
         y0 = H - box_h
@@ -283,11 +260,7 @@ async def main(cap):
             cv2.putText(vis, msg, (x_text + 250*k, y_text), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2, cv2.LINE_AA)
         
         # Display
-        #overlay = static_map_img
-        #alpha_overlay = 0.6 
-        #vis = cv2.addWeighted(transformed_frame, 1.0, overlay, alpha_overlay, 0.0)
         cv2.imshow("Transformed Camera Feed", cv2.resize(vis, (display_width, display_height)))
-        
     
         #--- Camera Window ---
         # Show the transformed frame live
@@ -311,23 +284,17 @@ async def main(cap):
          # final loop
         if step_count < len(waypoints):
             # get motion params
-            #vl_cmd, vr_cmd = control.get_cmd()
             z_mot= get_motor_meas()
             z_cam = get_cam_meas(transformed_frame)
             
             # EKF STEP
             if not kidnap_first:
                 ekf.step(vl_cmd, vr_cmd, z_cam, r_cam, z_mot, r_mot, filt.Ts, q_proc)
-                #print("ekf results:", ekf.x, ekf.P)
                 state = ekf_get_state()
-            # motion control
-            #print("waypoints:", waypoints)
             
             #--- LOCAL AVOIDANCE --- 
             if not(ln.prox_less_threshold(list(node["prox.horizontal"][:5]), 1500)) or obstacle_not_passed :
                 print("local avoidance")
-                #print(list(node["prox.horizontal"][:5]))
-                #print((list(node["prox.horizontal"][:5]), 700))
                 objectif = (waypoints[step_count][0]/10, waypoints[step_count][1]/10) 
                 curr_dir = (100*m.cos(state[2]), 100*m.sin(state[2]))
                 curr_pos = (state[0]/10, state[1]/10)
@@ -342,15 +309,9 @@ async def main(cap):
                     aw(control.set_motors(node,100,100))
                     await client.sleep(1.5)
                     obstacle_not_passed = False
-                    #if loop_count > sleep_time:  # non blocking sleep time (to get camera and filter updates)
-                    #    obstacle_not_passed = False
-                    #    loop_count = 0
-                    #loop_count += loop_count
                     
                     while step_count < len(waypoints) and dist_mm((state[0], state[1]), waypoints[step_count]) < thresh:
-                        #waypoints.pop(0)
                         step_count += 1
-                    #waypoints = maybe_pop_waypoint(state, last_state, waypoints, pos_tol_mm=50.0)
                     continue
                 
                 vect = ln.vect_calculation(objectif, (curr_pos),curr_dir,  prox_read[:5], 150, debug=False)
@@ -365,14 +326,12 @@ async def main(cap):
                 left_speed = int(100+(delta_speed/2))
                 right_speed = int(100-(delta_speed/2))
                 aw(control.set_motors(node, left=left_speed, right=right_speed))
-                #print(f" curr_pos = ({curr_pos[0]:.2f}, {curr_pos[1]:.2f}), vect = {angle_command:.2f} and delta_speed = {delta_speed:.2f}, curr_dir = ({curr_dir[0]:.2f}, {curr_dir[1]:.2f})")
                 await client.sleep(WAIT_TIME)
                 continue
-                #print(curr_dir, delta_speed*WAIT_TIME*m.pi/100, m.cos(delta_speed*WAIT_TIME*m.pi/100)
-    
+                
+                
             #--- FOLLOW THE GLOBAL PATH ---
             obstacle_not_passed = False
-            #print("CHECK")
             kidnap_first = aw(test_kidnap())
             if kidnap_first:
                 kidnap_second = aw(test_kidnap()) # gives next waypoint to go to if kidnapped
@@ -391,20 +350,15 @@ async def main(cap):
                     ekf_get_state()
                 step_count = update_kidnap(waypoints, ekf_traj)
                 kidnap_second = False
-            #print(step_count, type(step_count))
+
             step_count = await control.follow_path(node, state, waypoints, step_count, v_cmd=170, kp_heading=90.0,
                           pos_tol=12.0)
             await client.sleep(0.1)
+            
             # stop when goal reached
             if step_count >= len(waypoints):
                stop = True
         vl_cmd, vr_cmd = z_mot # take last values of motor speeds as command for next step     
-        # plot variances
-        #update_Ppred(ekf.P)
-        #print("P_pred")
-        #print(ekf.P)
-        #print("P_prior")
-        #print(ekf.P_pred_prior)
         
         if stop :
             aw(node.set_variables({"motor.left.target":[0], "motor.right.target":[0]}))

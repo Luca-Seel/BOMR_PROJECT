@@ -32,10 +32,6 @@ async def set_motors(node, left, right):
         "motor.left.target":  [int(left)],
         "motor.right.target": [int(right)],
     })
-    # print("I set some motor values in set_motor")
-    #print(int(left))
-    #print(int(right))
-    #print(int(node.v.motor.left.speed), int(node.v.motor.right.speed))
 
 async def stop(node):
     await set_motors(node, 0, 0)
@@ -45,20 +41,16 @@ async def stop(node):
 async def move_to_pos(node, state, target_x_mm, target_y_mm,
                 v_cmd=170, kp_heading=90.0, w_clip=20):
     x, y, theta = state[:3]
-    #print("ekf:", x,y,theta)
     dx, dy = target_x_mm - x, target_y_mm - y
-    #print("dx, dy:", dx, dy)
     theta_ref = math.atan2(dy, dx)
     e = wrap_angle(theta_ref - theta)
     w = max(-w_clip, min(w_clip, kp_heading * e))
+    
     if abs(e) > np.pi/8:
         await set_motors(node, w, -w)
-        #print("motor sets:", w, -w)
     else:
         await set_motors(node, v_cmd + w, v_cmd - w)
-        #print("motor sets:", v_cmd + w, v_cmd - w)
     
-    #await stop(node)
     return dx, dy
         
 # -------------------- Path utilities --------------------
@@ -76,7 +68,7 @@ def remove_collinear(pts, eps=1e-9):
         x1, y1 = pts[k]
         x2, y2 = pts[k+1]
         v1 = (x1 - x0, y1 - y0)
-        v2 = (x2 - x1, y2 - y0)  # minor improvement: reduce small numerical flicker
+        v2 = (x2 - x1, y2 - y0)  
         cross = v1[0]*(y2 - y1) - v1[1]*(x2 - x1)
         if abs(cross) > eps:
             out.append((x1, y1))
@@ -91,9 +83,9 @@ async def follow_path(node, state, waypoints, step_count, v_cmd=170, kp_heading=
     tx, ty = waypoints[step_count]
     dx, dy = await move_to_pos(node, state, tx, ty,
                 v_cmd=v_cmd, kp_heading=kp_heading, w_clip=200)
-    # check if waypoint reached, then delete it from our list
+    # check if waypoint reached, then move to next on our list
     dist = math.hypot(dx, dy)
-    #print("dist:", dist)
+    
     if dist <= pos_tol:
         step_count += 1 # move to next waypoint
     return step_count
