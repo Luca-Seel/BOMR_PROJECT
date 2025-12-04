@@ -2,13 +2,13 @@
 
 # Micro 452 - Basic Of Mobile Robotics
 ## Project 2025
-## group 12 
+ group 12 
 
-## The Team 
-> Paul Huot-Marchand
-> Luca Seelbach
-> Manuela Waible
+Paul Huot-Marchand<br>
+Luca Seelbach<br>
+Manuela Waible<br>
 </div>
+
 
 ## Work repartition : 
 ### Computer Vision :
@@ -40,4 +40,5 @@ For the environment, we chose to have a large white paper sheet with black obsta
 <img src="Report_images/Environnement.png" style="transform: rotate(-90deg)" width=500px>
 </div>
 
+**The full report of the project can be found in the `Group_T12_report.ipynb` file.**
 
