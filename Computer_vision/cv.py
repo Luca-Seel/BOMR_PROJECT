@@ -460,7 +460,7 @@ def get_robot(image):
     
     triangle =[]
     find_t = False
-    confidence = 100
+    confidence = 10
     for cnt in contours:
         find_t, tri= find_triangle(cnt, Rob_approx, Min_area_rob, Max_area_rob, image)
         #print(tri)

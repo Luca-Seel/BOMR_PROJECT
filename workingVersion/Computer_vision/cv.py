@@ -18,7 +18,6 @@ def get_picture_optimized(cap):
     time.sleep(0.1)  # let the camera apply settings
     
     ret, frame = cap.read()
-    #cap.release()
     
     if ret:
         return frame
@@ -100,22 +99,21 @@ D_T = 2
 
 
 #PARAMETERS TO DETECT THE ENV
-#Min_area_env = 1920*1080*0.01   #Min area in pixel of the env
 Min_area_env = 100
 Env_approx = 0.05
 
 #PARAMETERS TO DETECT THE OBSTACLES
-Min_area_obs = SIZE[0]*SIZE[1]*0.005   #Min area in pixel of the env
-Max_area_obs = SIZE[0]*SIZE[1]*0.5   #Max area in pixel of the env
+Min_area_obs = SIZE[0]*SIZE[1]*0.005   #Min area in pixel of the obstacles
+Max_area_obs = SIZE[0]*SIZE[1]*0.5   #Max area in pixel of the obstacles
 Obs_approx = 0.01
 
 #PARAMETERS TO DETECT GOAL
-Min_area_goal = np.pi * R_G_p * R_G_p *0.8
-Max_area_goal = np.pi * R_G_p * R_G_p * 1.8
+Min_area_goal = np.pi * R_G_p * R_G_p *0.8   # Min area in pixel of the Goal
+Max_area_goal = np.pi * R_G_p * R_G_p * 1.8  # Max area in pixel of the Goal
 
 #PARAMETERS TO DETECT THE ROBOT
-Min_area_rob = (L_T_p*H_T_p /2) * 0.5   #Min area in pixel of the env
-Max_area_rob =  (L_T_p*H_T_p /2) * 1.5
+Min_area_rob = (L_T_p*H_T_p /2) * 0.5   # Min area in pixel of the Robot
+Max_area_rob =  (L_T_p*H_T_p /2) * 1.5   # Max area in pixel of the Robot
 Rob_approx = 0.08
 
 #ROBOT CARACTERISTICS
@@ -248,7 +246,7 @@ def altitude_line(TOP, B, C):
     wx = Tx - Bx
     wy = Ty - By
 
-    # projection scalar to get foot of altitude
+    #  scalar projection to get foot of altitude
     u_dot_u = ux*ux + uy*uy
     t = (wx*ux + wy*uy) / u_dot_u
 
@@ -364,11 +362,7 @@ def filter_image(image, b1, b2, b3, c1, c2, m1, cl1, m, d, env = False, dil = Tr
     """
     INPUT : IMAGE AND FILTER PARAMETERS
     OUTPUT : IMAGE FILTERED
-    Apply successive filters to a given image : 
-    1. Convert to GreyScale
-    2. Bilatera filter
-    3. Canny edge filter
-    4. Morphological filter
+    Apply successive filters to a given image
     """
     if env :
         image= contour_fixing(image)
@@ -463,7 +457,7 @@ def get_robot(image):
     confidence = 10
     for cnt in contours:
         find_t, tri= find_triangle(cnt, Rob_approx, Min_area_rob, Max_area_rob, image)
-        #print(tri)
+        
         if find_t :
             _, conf = order_triangle(tri[0], tri[1], tri[2])
             if conf < confidence :
@@ -483,7 +477,7 @@ def get_robot(image):
     else :
         print("NO ROBOT FOUND")
         Rob = False
-    #pos = pixel_to_world_mm(pos)
+        
     return pos, angle, Rob
 
 
@@ -545,10 +539,8 @@ def get_map(image) :
         # Dimensions
         h, w = map_.shape
     
-        # Grille de coordonnées
         Y, X = np.ogrid[:h, :w]
     
-        # Condition du disque (distance <= rayon)
         dist_mask = (X - cx)**2 + (Y - cy)**2 <= radius**2
     
         # Application
